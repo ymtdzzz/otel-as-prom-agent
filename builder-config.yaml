@@ -1,0 +1,17 @@
+dist:
+  name: prom-cloud-monitoring-collector
+  description: Prometheus collector for Cloud Monitoring
+  output_path: ./prom-col
+  otelcol_version: 0.109.0
+
+exporters:
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/exporter/googlecloudexporter v0.109.0
+
+processors:
+  - gomod:
+      go.opentelemetry.io/collector/processor/batchprocessor v0.109.0
+
+receivers:
+  - gomod:
+      github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.109.0

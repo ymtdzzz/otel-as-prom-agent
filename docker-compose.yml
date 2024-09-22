@@ -1,0 +1,27 @@
+networks:
+  default:
+    name: otel-as-prom-agent
+    driver: bridge
+
+services:
+  app:
+    image: quay.io/brancz/prometheus-example-app:v0.3.0
+    container_name: app
+    ports:
+      - "8080:8080"
+
+  prom-col:
+    build:
+      context: .
+    container_name: prom-col
+    command: [ "./prom-col", "--config=/etc/config.yml" ]
+    volumes:
+      - ./config.yml:/etc/config.yml
+      - ./key.json:/etc/key.json
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/key.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      app:
+        condition: service_started

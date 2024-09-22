@@ -1,0 +1,72 @@
+#cloud-config
+
+write_files:
+  - path: /etc/systemd/system/create-network.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Create network for containers
+      Before=app.service promcol.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/docker network create my-bridge
+      RemainAfterExit=true
+
+  - path: /etc/systemd/system/app.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Start app container
+      After=create-network.service
+
+      [Service]
+      Environment="HOME=/home/cloudservice"
+      ExecStart=/usr/bin/docker run --rm --network my-bridge --name app quay.io/brancz/prometheus-example-app:v0.3.0
+      ExecStop=/usr/bin/docker stop app
+
+  - path: /etc/systemd/system/promcol.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Start promcol container
+      After=create-network.service
+
+      [Service]
+      Environment="HOME=/home/cloudservice"
+      ExecStart=/usr/bin/docker run --rm --network my-bridge -v /etc/config.yml:/etc/config.yml --name promcol ymtdzzz/otel-as-prom-agent:test ./prom-col --config=/etc/config.yml
+      ExecStop=/usr/bin/docker stop promcol
+      
+  - path: /etc/config.yml
+    permissions: 0644
+    owner: root
+    content: |
+      receivers:
+          prometheus:
+            config:
+              scrape_configs:
+                - job_name: 'prom-col'
+                  scrape_interval: 5s
+                  static_configs:
+                    - targets: ['app:8080']
+      exporters:
+        googlecloud:
+          log:
+            default_log_name: opentelemetry.io/collector-exported-log
+      processors:
+        batch:
+      service:
+        pipelines:
+          metrics:
+            receivers: [prometheus]
+            processors: [batch] # NOTICE: use memory_limiter in production
+            exporters: [googlecloud]
+
+runcmd:
+  - systemctl daemon-reload
+  - systemctl start create-network.service
+  - systemctl start app.service
+  - systemctl start promcol.service
